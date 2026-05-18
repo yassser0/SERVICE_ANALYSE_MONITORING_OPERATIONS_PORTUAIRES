@@ -70,7 +70,7 @@ services:
       kafka:
         condition: service_healthy
     ports:
-      - "9000:9000"
+      - "9010:9000"
     environment:
       KAFKA_BROKERCONNECT: kafka:29092
       JVM_OPTS: "-Xms32M -Xmx64M"

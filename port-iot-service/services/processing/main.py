@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Query, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from typing import List
@@ -102,3 +104,13 @@ async def get_statistics(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching statistics: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+# Serve Interactive Dashboard HTML at Root "/"
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+
+@app.get("/")
+async def get_dashboard():
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail="Dashboard index.html not found")

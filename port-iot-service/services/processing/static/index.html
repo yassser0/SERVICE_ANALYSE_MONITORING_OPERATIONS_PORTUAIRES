@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marsa Maroc - Smart Port IoT Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 25, 40, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #00f2fe;
+            --primary-glow: rgba(0, 242, 254, 0.4);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+            --text: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) var(--bg-color);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(0, 242, 254, 0.05) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(239, 68, 68, 0.03) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(11, 15, 25, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--card-border);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo i {
+            color: var(--primary);
+            -webkit-text-fill-color: initial;
+            filter: drop-shadow(0 0 8px var(--primary));
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 20px;
+            color: var(--success);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-badge .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.6; }
+        }
+
+        /* Container Principal */
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        /* KPI Cards */
+        .kpi-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(16px);
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 242, 254, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 242, 254, 0.1);
+        }
+
+        .kpi-info h3 {
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .kpi-info p {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .kpi-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+        }
+
+        .kpi-blue { background: rgba(0, 242, 254, 0.1); color: var(--primary); }
+        .kpi-green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .kpi-amber { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+        .kpi-red { 
+            background: rgba(239, 68, 68, 0.1); 
+            color: var(--danger);
+            animation: pulse-border 2s infinite; 
+        }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Layout Grid Sections */
+        .main-grid {
+            grid-column: span 4;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .card-header i {
+            color: var(--primary);
+        }
+
+        /* Map styling */
+        #map {
+            height: 450px;
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 1;
+        }
+
+        /* Anomalies List */
+        .anomaly-feed {
+            max-height: 450px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 8px;
+        }
+
+        .anomaly-item {
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 4px solid var(--danger);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .anomaly-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            transform: translateX(3px);
+        }
+
+        .anomaly-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .anomaly-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #f3f4f6;
+        }
+
+        .anomaly-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .severity-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .sev-CRITICAL { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .sev-HIGH { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .sev-MEDIUM { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+
+        /* Container Table */
+        .table-card {
+            grid-column: span 4;
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            padding: 14px 16px;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--card-border);
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 15px;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-active { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .badge-error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .badge-maintenance { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+        .badge-flagged { background: rgba(239, 68, 68, 0.2); color: var(--danger); font-weight: 800; animation: blink 1.5s infinite; }
+
+        @keyframes blink {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        /* Leaflet popup styling override */
+        .leaflet-popup-content-wrapper {
+            background-color: var(--bg-color) !important;
+            color: var(--text) !important;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+        }
+        .leaflet-popup-tip {
+            background-color: var(--bg-color) !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-ship"></i>
+            <span>MARSA MAROC <span style="font-weight:300; font-size:16px;">| Smart Port IoT</span></span>
+        </div>
+        <div class="status-badge">
+            <span class="dot"></span>
+            <span>Flux de données Kafka Actif</span>
+        </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <div class="dashboard-container">
+        
+        <!-- KPI 1 -->
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>Conteneurs Actifs</h3>
+                <p id="kpi-containers">-</p>
+            </div>
+            <div class="kpi-icon kpi-blue">
+                <i class="fa-solid fa-box-open"></i>
+            </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>Capteurs Connectés</h3>
+                <p id="kpi-sensors">-</p>
+            </div>
+            <div class="kpi-icon kpi-green">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>Anomalies Détectées</h3>
+                <p id="kpi-anomalies">-</p>
+            </div>
+            <div class="kpi-icon kpi-red">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+        </div>
+
+        <!-- KPI 4 -->
+        <div class="kpi-card">
+            <div class="kpi-info">
+                <h3>Zone la plus Active</h3>
+                <p id="kpi-active-zone" style="font-size: 18px; margin-top: 5px;">-</p>
+            </div>
+            <div class="kpi-icon kpi-amber">
+                <i class="fa-solid fa-map-location-dot"></i>
+            </div>
+        </div>
+
+        <!-- Main section with Map and Feed -->
+        <div class="main-grid">
+            
+            <!-- Map Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span><i class="fa-solid fa-earth-africa"></i> Positions en Temps Réel (Port de Casablanca)</span>
+                    <span style="font-size:12px; color: var(--text-muted);">Mise à jour 3s</span>
+                </div>
+                <div id="map"></div>
+            </div>
+
+            <!-- Anomalies Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span><i class="fa-solid fa-bell"></i> Alertes Récentes</span>
+                    <span style="font-size:12px; color: var(--danger);"><i class="fa-solid fa-circle-nodes"></i> Live Feed</span>
+                </div>
+                <div class="anomaly-feed" id="anomaly-container">
+                    <!-- Dynamic Items will be appended here -->
+                    <div style="text-align:center; padding:50px; color: var(--text-muted);">En attente de données...</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Containers Table Card -->
+        <div class="card table-card">
+            <div class="card-header">
+                <span><i class="fa-solid fa-list"></i> Liste des Conteneurs en Transit</span>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID Conteneur</th>
+                            <th>Zone Actuelle</th>
+                            <th>Température</th>
+                            <th>Statut Équipement</th>
+                            <th>Dernier Signal</th>
+                            <th>Alerte</th>
+                        </tr>
+                    </thead>
+                    <tbody id="container-rows">
+                        <tr>
+                            <td colspan="6" style="text-align:center; color: var(--text-muted); padding:30px;">Chargement des données...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Leaflet JS Map Engine -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        // Initialiser la carte sur le port de Casablanca
+        const map = L.map('map').setView([33.608, -7.585], 14);
+
+        // Ajouter une couche de carte au design sombre futuriste (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Groupe pour stocker les marqueurs de conteneurs
+        const markerGroup = L.layerGroup().addTo(map);
+
+        // Fonction pour formater les dates
+        function formatDate(dateStr) {
+            if (!dateStr) return "-";
+            const date = new Date(dateStr);
+            return date.toLocaleTimeString('fr-FR') + ' (' + date.toLocaleDateString('fr-FR') + ')';
+        }
+
+        // Fonction principale pour récupérer et actualiser les données du Backend FastAPI
+        async function fetchDashboardData() {
+            try {
+                // 1. Récupérer les Conteneurs
+                const containersRes = await fetch('/containers?limit=10');
+                const containers = await containersRes.json();
+                
+                // 2. Récupérer les Capteurs (pour les KPI)
+                const sensorsRes = await fetch('/sensors');
+                const sensors = await sensorsRes.json();
+
+                // 3. Récupérer les Anomalies
+                const anomaliesRes = await fetch('/anomalies?limit=10');
+                const anomalies = await anomaliesRes.json();
+
+                // 4. Récupérer les Stats par zone
+                const statsRes = await fetch('/statistics');
+                const stats = await statsRes.json();
+
+                // === MISE A JOUR DES KPI ===
+                document.getElementById('kpi-containers').innerText = containers ? containers.length : 0;
+                document.getElementById('kpi-sensors').innerText = sensors ? sensors.length : 0;
+                document.getElementById('kpi-anomalies').innerText = anomalies ? anomalies.length : 0;
+                
+                if(stats && stats.data && stats.data.length > 0) {
+                    // Trouver la zone avec le plus d'activité (total_events_1h)
+                    const sortedZones = [...stats.data].sort((a,b) => b.total_events_1h - a.total_events_1h);
+                    if (sortedZones[0] && sortedZones[0].zone) {
+                        document.getElementById('kpi-active-zone').innerText = sortedZones[0].zone.replace('_', ' ') + ' (' + sortedZones[0].total_events_1h + ' msg/h)';
+                    } else {
+                        document.getElementById('kpi-active-zone').innerText = "Aucune active";
+                    }
+                } else {
+                    document.getElementById('kpi-active-zone').innerText = "Aucune";
+                }
+
+                // === MISE A JOUR DES ANOMALIES (FEED) ===
+                const anomalyContainer = document.getElementById('anomaly-container');
+                if (!anomalies || anomalies.length === 0) {
+                    anomalyContainer.innerHTML = `<div style="text-align:center; padding:50px; color: var(--text-muted);">Aucune anomalie détectée</div>`;
+                } else {
+                    anomalyContainer.innerHTML = anomalies.map(anom => {
+                        const typeStr = anom.anomaly_type ? anom.anomaly_type.replace(/_/g, ' ') : 'ANOMALIE';
+                        const descStr = anom.description || 'Valeur hors limite';
+                        const sevClass = anom.severity || 'MEDIUM';
+                        const sensorStr = anom.sensor_id || 'INCONNU';
+                        const timeStr = anom.detected_at ? new Date(anom.detected_at).toLocaleTimeString('fr-FR') : '--:--';
+                        
+                        return `
+                        <div class="anomaly-item">
+                            <div class="anomaly-meta">
+                                <span><i class="fa-solid fa-microchip"></i> ${sensorStr}</span>
+                                <span class="severity-badge sev-${sevClass}">${sevClass}</span>
+                            </div>
+                            <span class="anomaly-title">${typeStr}</span>
+                            <span class="anomaly-desc">${descStr}</span>
+                            <span style="font-size:10px; color: var(--text-muted); align-self: flex-end;">
+                                <i class="fa-regular fa-clock"></i> ${timeStr}
+                            </span>
+                        </div>
+                    `}).join('');
+                }
+
+                // === MISE A JOUR DU TABLEAU DES CONTENEURS ===
+                const tableBody = document.getElementById('container-rows');
+                if(!containers || containers.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Aucun conteneur en transit</td></tr>`;
+                } else {
+                    tableBody.innerHTML = containers.map(c => {
+                        const cid = c.container_id || 'INCONNU';
+                        const zoneStr = c.current_zone ? c.current_zone.replace(/_/g, ' ') : 'Transit';
+                        const tempStr = c.temperature_celsius !== null && c.temperature_celsius !== undefined ? c.temperature_celsius.toFixed(1) + ' °C' : '-';
+                        const eqStatus = c.equipment_status || 'ACTIVE';
+                        const flaggedStr = c.is_flagged ? '<span class="badge badge-flagged"><i class="fa-solid fa-triangle-exclamation"></i> ALERTE</span>' : '<span style="color:var(--success);"><i class="fa-solid fa-circle-check"></i> R.A.S</span>';
+                        
+                        return `
+                        <tr>
+                            <td style="font-weight: 800; color: var(--primary);">${cid}</td>
+                            <td><i class="fa-solid fa-map-pin" style="color:var(--primary); margin-right:6px;"></i> ${zoneStr}</td>
+                            <td style="font-weight:600;">${tempStr}</td>
+                            <td><span class="badge badge-${eqStatus.toLowerCase()}">${eqStatus}</span></td>
+                            <td style="font-size:13px; color: var(--text-muted);">${formatDate(c.last_seen)}</td>
+                            <td>${flaggedStr}</td>
+                        </tr>
+                    `}).join('');
+                }
+
+                // === MISE A JOUR DE LA CARTE INTERACTIVE ===
+                markerGroup.clearLayers();
+                if (containers) {
+                    containers.forEach(c => {
+                        if (c.current_lat !== null && c.current_lon !== null) {
+                            const lat = parseFloat(c.current_lat);
+                            const lon = parseFloat(c.current_lon);
+                            
+                            // VALIDATION GÉOGRAPHIQUE : Filtrer les coordonnées aberrantes pour ne pas faire planter Leaflet
+                            if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                                const isAnomaly = c.is_flagged;
+                                
+                                // Icone personnalisée et colorée selon le statut d'anomalie
+                                const markerColor = isAnomaly ? '#ef4444' : '#00f2fe';
+                                const markerIcon = L.divIcon({
+                                    className: 'custom-div-icon',
+                                    html: `<div style="background-color: ${markerColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px ${markerColor};"></div>`,
+                                    iconSize: [14, 14],
+                                    iconAnchor: [7, 7]
+                                });
+
+                                const marker = L.marker([lat, lon], { icon: markerIcon });
+                                const cid = c.container_id || 'INCONNU';
+                                const zoneStr = c.current_zone ? c.current_zone.replace(/_/g, ' ') : 'Transit';
+                                const tempStr = c.temperature_celsius !== null && c.temperature_celsius !== undefined ? c.temperature_celsius.toFixed(1) + ' °C' : '-';
+                                const eqStatus = c.equipment_status || 'ACTIVE';
+
+                                // Ajouter une popup riche au clic sur le conteneur
+                                marker.bindPopup(`
+                                    <div style="font-family: 'Outfit', sans-serif; font-size:13px;">
+                                        <strong style="color:var(--primary); font-size:14px;">${cid}</strong><br/>
+                                        <hr style="margin:6px 0; border-color: rgba(255,255,255,0.1);"/>
+                                        <b>Zone:</b> ${zoneStr}<br/>
+                                        <b>Temp:</b> ${tempStr}<br/>
+                                        <b>Équipement:</b> ${eqStatus}<br/>
+                                        <b>Statut:</b> ${isAnomaly ? '<span style="color:#ef4444; font-weight:800;">⚠️ ALERTE ANOMALIE</span>' : '<span style="color:#10b981;">✅ OK</span>'}
+                                    </div>
+                                `);
+                                markerGroup.addLayer(marker);
+                            } else {
+                                console.warn(`Coordonnées GPS hors-limites ignorées pour la carte : ${c.container_id} (${lat}, ${lon})`);
+                            }
+                        }
+                    });
+                }
+
+            } catch (err) {
+                console.error("Erreur lors de la récupération des données du dashboard: ", err);
+            }
+        }
+
+        // Première exécution immédiate
+        fetchDashboardData();
+
+        // Actualiser automatiquement toutes les 3 secondes pour un effet "temps réel"
+        setInterval(fetchDashboardData, 3000);
+
+    </script>
+</body>
+</html>
