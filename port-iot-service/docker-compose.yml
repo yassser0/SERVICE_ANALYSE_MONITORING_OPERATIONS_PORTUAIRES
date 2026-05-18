@@ -151,6 +151,7 @@ services:
       - EMIT_INTERVAL_SECONDS=3
       - NUM_SENSORS=20
       - LOG_LEVEL=INFO
+      - ANOMALY_PROBABILITY=${ANOMALY_PROBABILITY:-0.4}
     networks:
       - port-iot-network
     restart: unless-stopped

@@ -13,6 +13,7 @@ KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "port-iot-data")
 EMIT_INTERVAL_SECONDS = int(os.getenv("EMIT_INTERVAL_SECONDS", "3"))
 NUM_SENSORS = int(os.getenv("NUM_SENSORS", "20"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+ANOMALY_PROBABILITY = float(os.getenv("ANOMALY_PROBABILITY", "0.4"))
 
 # Setup Logging
 logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,8 +50,8 @@ def generate_sensor_data(sensor):
         "container_id": random.choice(CONTAINERS) if random.random() > 0.3 else None
     }
     
-    # Introduce anomalies randomly (e.g., ~5% chance for some fields)
-    is_anomaly = random.random() < 0.05
+    # Introduce anomalies randomly based on configured probability
+    is_anomaly = random.random() < ANOMALY_PROBABILITY
     
     # Coordinates for Port (roughly)
     # Lat: 33.5 to 34.0, Lon: -8.0 to -7.5
