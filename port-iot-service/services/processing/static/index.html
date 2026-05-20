@@ -1,625 +1,488 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marsa Maroc - Smart Port IoT Dashboard</title>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <!-- Leaflet Map CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 25, 40, 0.75);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --primary: #00f2fe;
-            --primary-glow: rgba(0, 242, 254, 0.4);
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --danger-glow: rgba(239, 68, 68, 0.4);
-            --text: #f3f4f6;
-            --text-muted: #9ca3af;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Port IoT — Smart Port Operations Center</title>
+  <meta name="description" content="Real-time IoT monitoring dashboard for smart port operations — sensors, containers, vessels and anomalies." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #080c14;
+      --surface:    #0d1520;
+      --surface2:   #111d2e;
+      --border:     rgba(100,200,255,.10);
+      --accent:     #00b4ff;
+      --accent2:    #0066ff;
+      --green:      #00e676;
+      --yellow:     #ffd740;
+      --orange:     #ff9100;
+      --red:        #ff3d57;
+      --text:       #e2eaf5;
+      --muted:      #6b8aad;
+      --radius:     14px;
+      --font:       'Inter', sans-serif;
+      --mono:       'JetBrains Mono', monospace;
+    }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Outfit', sans-serif;
-            scrollbar-width: thin;
-            scrollbar-color: var(--primary) var(--bg-color);
-        }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text);
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(at 10% 20%, rgba(0, 242, 254, 0.05) 0px, transparent 50%),
-                radial-gradient(at 90% 80%, rgba(239, 68, 68, 0.03) 0px, transparent 50%);
-            background-attachment: fixed;
-        }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-        /* Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 40px;
-            background: rgba(11, 15, 25, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--card-border);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
+    /* ── Animated background grid ──────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,180,255,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,180,255,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 24px;
-            font-weight: 800;
-            letter-spacing: 1px;
-            background: linear-gradient(90deg, #fff, var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+    /* ── Top bar ────────────────────────────────────────────────────────────── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px;
+      height: 64px;
+      background: rgba(8,12,20,.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
 
-        .logo i {
-            color: var(--primary);
-            -webkit-text-fill-color: initial;
-            filter: drop-shadow(0 0 8px var(--primary));
-        }
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+      font-weight: 800; font-size: 1.1rem; letter-spacing: -.3px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      display: grid; place-items: center; font-size: 1.1rem;
+    }
 
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            border-radius: 20px;
-            color: var(--success);
-            font-size: 14px;
-            font-weight: 600;
-        }
+    .status-bar {
+      display: flex; align-items: center; gap: 20px;
+      font-size: .8rem; color: var(--muted);
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-        .status-badge .dot {
-            width: 8px;
-            height: 8px;
-            background-color: var(--success);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--success);
-            animation: pulse 1.5s infinite;
-        }
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
+    main { position: relative; z-index: 1; padding: 28px 32px; max-width: 1600px; margin: 0 auto; }
 
-        @keyframes pulse {
-            0% { transform: scale(0.9); opacity: 0.6; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.9); opacity: 0.6; }
-        }
+    h2.section-title {
+      font-size: .7rem; font-weight: 600; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 16px; margin-top: 32px;
+    }
+    h2.section-title:first-child { margin-top: 0; }
 
-        /* Container Principal */
-        .dashboard-container {
-            max-width: 1600px;
-            margin: 30px auto;
-            padding: 0 20px;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-        }
+    /* ── KPI Cards ──────────────────────────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 16px;
+      margin-bottom: 4px;
+    }
 
-        /* KPI Cards */
-        .kpi-card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            backdrop-filter: blur(16px);
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
-        }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+      position: relative; overflow: hidden;
+    }
+    .kpi-card::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(0,180,255,.04), transparent);
+      pointer-events: none;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,.4); border-color: rgba(0,180,255,.25); }
 
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(0, 242, 254, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(0, 242, 254, 0.1);
-        }
+    .kpi-icon { font-size: 1.6rem; margin-bottom: 12px; }
+    .kpi-value {
+      font-size: 2.2rem; font-weight: 800; line-height: 1;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(135deg, var(--text), var(--muted));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .kpi-value.accent  { background: linear-gradient(135deg, var(--accent), var(--accent2));  -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .kpi-value.green   { background: linear-gradient(135deg, var(--green), #00c853);           -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .kpi-value.red     { background: linear-gradient(135deg, var(--red), #c62828);             -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .kpi-value.orange  { background: linear-gradient(135deg, var(--orange), var(--yellow));    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-        .kpi-info h3 {
-            font-size: 14px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
+    .kpi-label { font-size: .72rem; color: var(--muted); margin-top: 6px; font-weight: 500; }
 
-        .kpi-info p {
-            font-size: 28px;
-            font-weight: 800;
-        }
+    /* ── Two-column grid ────────────────────────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
 
-        .kpi-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 20px;
-        }
+    /* ── Panel ──────────────────────────────────────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: .85rem; font-weight: 600;
+    }
+    .panel-body { padding: 0; }
 
-        .kpi-blue { background: rgba(0, 242, 254, 0.1); color: var(--primary); }
-        .kpi-green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .kpi-amber { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-        .kpi-red { 
-            background: rgba(239, 68, 68, 0.1); 
-            color: var(--danger);
-            animation: pulse-border 2s infinite; 
-        }
+    /* ── Table ──────────────────────────────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    .data-table th {
+      text-align: left; padding: 10px 16px;
+      color: var(--muted); font-weight: 600; letter-spacing: .5px; font-size: .7rem; text-transform: uppercase;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      padding: 10px 16px; border-bottom: 1px solid rgba(100,200,255,.05);
+      font-variant-numeric: tabular-nums;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(0,180,255,.04); }
 
-        @keyframes pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
-            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
+    /* ── Badges ─────────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 20px;
+      font-size: .68rem; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    }
+    .badge-critical { background: rgba(255,61,87,.15);  color: var(--red);    border: 1px solid rgba(255,61,87,.3); }
+    .badge-high     { background: rgba(255,145,0,.15);  color: var(--orange); border: 1px solid rgba(255,145,0,.3); }
+    .badge-medium   { background: rgba(255,215,64,.12); color: var(--yellow); border: 1px solid rgba(255,215,64,.3); }
+    .badge-low      { background: rgba(0,230,118,.10);  color: var(--green);  border: 1px solid rgba(0,230,118,.3); }
+    .badge-active   { background: rgba(0,230,118,.10);  color: var(--green);  border: 1px solid rgba(0,230,118,.3); }
+    .badge-idle     { background: rgba(107,138,173,.12);color: var(--muted);  border: 1px solid rgba(107,138,173,.3);}
+    .badge-error    { background: rgba(255,61,87,.15);  color: var(--red);    border: 1px solid rgba(255,61,87,.3); }
+    .badge-docked   { background: rgba(0,180,255,.12);  color: var(--accent); border: 1px solid rgba(0,180,255,.3); }
+    .badge-loading  { background: rgba(0,102,255,.12);  color: #6699ff;       border: 1px solid rgba(0,102,255,.3); }
+    .badge-departing{ background: rgba(255,215,64,.12); color: var(--yellow); border: 1px solid rgba(255,215,64,.3); }
 
-        /* Layout Grid Sections */
-        .main-grid {
-            grid-column: span 4;
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-        }
+    /* ── Battery bar ────────────────────────────────────────────────────────── */
+    .bat-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .bat-bar { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .bat-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+    .bat-label { font-family: var(--mono); font-size: .72rem; width: 38px; text-align: right; }
 
-        /* Cards */
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 24px;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
-            display: flex;
-            flex-direction: column;
-        }
+    /* ── Zone map ───────────────────────────────────────────────────────────── */
+    .zone-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px; padding: 16px;
+    }
+    .zone-cell {
+      border-radius: 10px; padding: 12px 8px;
+      text-align: center;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      transition: transform .2s, border-color .2s;
+      cursor: default;
+    }
+    .zone-cell:hover { transform: translateY(-2px); }
+    .zone-cell.ok     { border-color: rgba(0,230,118,.3);  background: rgba(0,230,118,.05); }
+    .zone-cell.warn   { border-color: rgba(255,145,0,.3);  background: rgba(255,145,0,.05); }
+    .zone-cell.danger { border-color: rgba(255,61,87,.3);  background: rgba(255,61,87,.05); animation: borderPulse 2s infinite; }
+    @keyframes borderPulse { 0%,100%{border-color: rgba(255,61,87,.3)} 50%{border-color: rgba(255,61,87,.8)} }
+    .zone-name { font-size: .65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .zone-count { font-size: 1.4rem; font-weight: 800; margin: 4px 0; }
+    .zone-label { font-size: .6rem; color: var(--muted); }
 
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            font-weight: 600;
-            font-size: 18px;
-        }
+    /* ── Refresh ticker ─────────────────────────────────────────────────────── */
+    .refresh-bar {
+      height: 3px; background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 2px;
+      animation: shrink 5s linear infinite;
+      transform-origin: left;
+    }
+    @keyframes shrink { from{transform:scaleX(1)} to{transform:scaleX(0)} }
 
-        .card-header i {
-            color: var(--primary);
-        }
+    /* ── Empty state ────────────────────────────────────────────────────────── */
+    .empty { padding: 32px; text-align: center; color: var(--muted); font-size: .82rem; }
 
-        /* Map styling */
-        #map {
-            height: 450px;
-            width: 100%;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            z-index: 1;
-        }
+    /* ── Spinner ────────────────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-left: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Anomalies List */
-        .anomaly-feed {
-            max-height: 450px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding-right: 8px;
-        }
-
-        .anomaly-item {
-            background: rgba(255, 255, 255, 0.02);
-            border-left: 4px solid var(--danger);
-            border-radius: 8px;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            transition: all 0.2s ease;
-        }
-
-        .anomaly-item:hover {
-            background: rgba(255, 255, 255, 0.04);
-            transform: translateX(3px);
-        }
-
-        .anomaly-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .anomaly-title {
-            font-weight: 600;
-            font-size: 14px;
-            color: #f3f4f6;
-        }
-
-        .anomaly-desc {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-
-        .severity-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: 800;
-            text-transform: uppercase;
-        }
-
-        .sev-CRITICAL { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
-        .sev-HIGH { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-        .sev-MEDIUM { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
-
-        /* Container Table */
-        .table-card {
-            grid-column: span 4;
-        }
-
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-
-        th {
-            padding: 14px 16px;
-            color: var(--text-muted);
-            font-weight: 600;
-            border-bottom: 1px solid var(--card-border);
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-
-        td {
-            padding: 14px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            font-size: 15px;
-        }
-
-        tr:hover td {
-            background: rgba(255, 255, 255, 0.01);
-        }
-
-        .badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            display: inline-block;
-        }
-
-        .badge-active { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-        .badge-error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
-        .badge-maintenance { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-        .badge-flagged { background: rgba(239, 68, 68, 0.2); color: var(--danger); font-weight: 800; animation: blink 1.5s infinite; }
-
-        @keyframes blink {
-            0% { opacity: 0.6; }
-            50% { opacity: 1; }
-            100% { opacity: 0.6; }
-        }
-
-        /* Leaflet popup styling override */
-        .leaflet-popup-content-wrapper {
-            background-color: var(--bg-color) !important;
-            color: var(--text) !important;
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-        }
-        .leaflet-popup-tip {
-            background-color: var(--bg-color) !important;
-        }
-    </style>
+    /* ── Scroll ─────────────────────────────────────────────────────────────── */
+    .scroll-body { max-height: 340px; overflow-y: auto; }
+    .scroll-body::-webkit-scrollbar { width: 4px; }
+    .scroll-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <header>
-        <div class="logo">
-            <i class="fa-solid fa-ship"></i>
-            <span>MARSA MAROC <span style="font-weight:300; font-size:16px;">| Smart Port IoT</span></span>
-        </div>
-        <div class="status-badge">
-            <span class="dot"></span>
-            <span>Flux de données Kafka Actif</span>
-        </div>
-    </header>
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚓</div>
+    <span>Port IoT — Operations Center</span>
+  </div>
+  <div class="status-bar">
+    <div class="live-dot"></div>
+    <span id="last-update">Connecting…</span>
+    <span id="refresh-status"></span>
+  </div>
+</header>
 
-    <!-- Dashboard Content -->
-    <div class="dashboard-container">
-        
-        <!-- KPI 1 -->
-        <div class="kpi-card">
-            <div class="kpi-info">
-                <h3>Conteneurs Actifs</h3>
-                <p id="kpi-containers">-</p>
-            </div>
-            <div class="kpi-icon kpi-blue">
-                <i class="fa-solid fa-box-open"></i>
-            </div>
-        </div>
+<div class="refresh-bar" id="refresh-bar"></div>
 
-        <!-- KPI 2 -->
-        <div class="kpi-card">
-            <div class="kpi-info">
-                <h3>Capteurs Connectés</h3>
-                <p id="kpi-sensors">-</p>
-            </div>
-            <div class="kpi-icon kpi-green">
-                <i class="fa-solid fa-microchip"></i>
-            </div>
-        </div>
+<main>
 
-        <!-- KPI 3 -->
-        <div class="kpi-card">
-            <div class="kpi-info">
-                <h3>Anomalies Détectées</h3>
-                <p id="kpi-anomalies">-</p>
-            </div>
-            <div class="kpi-icon kpi-red">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </div>
-        </div>
+  <!-- KPI Row -->
+  <h2 class="section-title">Live Overview</h2>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi-card"><div class="kpi-icon">📦</div><div class="kpi-value" id="kpi-containers">—</div><div class="kpi-label">Total Containers</div></div>
+    <div class="kpi-card"><div class="kpi-icon">🚨</div><div class="kpi-value red" id="kpi-anomalies">—</div><div class="kpi-label">Open Anomalies</div></div>
+    <div class="kpi-card"><div class="kpi-icon">📡</div><div class="kpi-value green" id="kpi-sensors">—</div><div class="kpi-label">Active Sensors</div></div>
+    <div class="kpi-card"><div class="kpi-icon">🚢</div><div class="kpi-value accent" id="kpi-vessels">—</div><div class="kpi-label">Vessels Docked</div></div>
+    <div class="kpi-card"><div class="kpi-icon">🚩</div><div class="kpi-value orange" id="kpi-flagged">—</div><div class="kpi-label">Flagged Containers</div></div>
+  </div>
 
-        <!-- KPI 4 -->
-        <div class="kpi-card">
-            <div class="kpi-info">
-                <h3>Zone la plus Active</h3>
-                <p id="kpi-active-zone" style="font-size: 18px; margin-top: 5px;">-</p>
-            </div>
-            <div class="kpi-icon kpi-amber">
-                <i class="fa-solid fa-map-location-dot"></i>
-            </div>
-        </div>
+  <!-- Zone Map + Anomaly Feed -->
+  <h2 class="section-title">Zone Status &amp; Live Anomalies</h2>
+  <div class="two-col">
 
-        <!-- Main section with Map and Feed -->
-        <div class="main-grid">
-            
-            <!-- Map Card -->
-            <div class="card">
-                <div class="card-header">
-                    <span><i class="fa-solid fa-earth-africa"></i> Positions en Temps Réel (Port de Casablanca)</span>
-                    <span style="font-size:12px; color: var(--text-muted);">Mise à jour 3s</span>
-                </div>
-                <div id="map"></div>
-            </div>
-
-            <!-- Anomalies Card -->
-            <div class="card">
-                <div class="card-header">
-                    <span><i class="fa-solid fa-bell"></i> Alertes Récentes</span>
-                    <span style="font-size:12px; color: var(--danger);"><i class="fa-solid fa-circle-nodes"></i> Live Feed</span>
-                </div>
-                <div class="anomaly-feed" id="anomaly-container">
-                    <!-- Dynamic Items will be appended here -->
-                    <div style="text-align:center; padding:50px; color: var(--text-muted);">En attente de données...</div>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- Containers Table Card -->
-        <div class="card table-card">
-            <div class="card-header">
-                <span><i class="fa-solid fa-list"></i> Liste des Conteneurs en Transit</span>
-            </div>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID Conteneur</th>
-                            <th>Zone Actuelle</th>
-                            <th>Température</th>
-                            <th>Statut Équipement</th>
-                            <th>Dernier Signal</th>
-                            <th>Alerte</th>
-                        </tr>
-                    </thead>
-                    <tbody id="container-rows">
-                        <tr>
-                            <td colspan="6" style="text-align:center; color: var(--text-muted); padding:30px;">Chargement des données...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
+    <div class="panel">
+      <div class="panel-header">
+        🗺️ Port Zone Health
+        <span style="font-size:.7rem;color:var(--muted)">Events last 1h</span>
+      </div>
+      <div class="zone-grid" id="zone-grid">
+        <div class="empty">Loading zones…</div>
+      </div>
     </div>
 
-    <!-- Leaflet JS Map Engine -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <script>
-        // Initialiser la carte sur le port de Casablanca
-        const map = L.map('map').setView([33.608, -7.585], 14);
+    <div class="panel">
+      <div class="panel-header">
+        🚨 Recent Anomalies
+        <span style="font-size:.7rem;color:var(--muted)">Last 20</span>
+      </div>
+      <div class="panel-body scroll-body">
+        <table class="data-table" id="anomaly-table">
+          <thead><tr>
+            <th>Type</th><th>Severity</th><th>Zone</th><th>Sensor</th><th>Time</th>
+          </tr></thead>
+          <tbody><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
-        // Ajouter une couche de carte au design sombre futuriste (CartoDB Dark Matter)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(map);
+  </div>
 
-        // Groupe pour stocker les marqueurs de conteneurs
-        const markerGroup = L.layerGroup().addTo(map);
+  <!-- Vessels + Sensor Health -->
+  <h2 class="section-title">Vessels &amp; Sensor Health</h2>
+  <div class="two-col">
 
-        // Fonction pour formater les dates
-        function formatDate(dateStr) {
-            if (!dateStr) return "-";
-            const date = new Date(dateStr);
-            return date.toLocaleTimeString('fr-FR') + ' (' + date.toLocaleDateString('fr-FR') + ')';
-        }
+    <div class="panel">
+      <div class="panel-header">🚢 Vessels in Port</div>
+      <div class="panel-body scroll-body">
+        <table class="data-table" id="vessel-table">
+          <thead><tr>
+            <th>Vessel</th><th>Flag</th><th>Berth</th><th>Status</th><th>Arrival</th>
+          </tr></thead>
+          <tbody><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
-        // Fonction principale pour récupérer et actualiser les données du Backend FastAPI
-        async function fetchDashboardData() {
-            try {
-                // 1. Récupérer les Conteneurs
-                const containersRes = await fetch('/containers?limit=10');
-                const containers = await containersRes.json();
-                
-                // 2. Récupérer les Anomalies
-                const anomaliesRes = await fetch('/anomalies?limit=10');
-                const anomalies = await anomaliesRes.json();
+    <div class="panel">
+      <div class="panel-header">🔋 Sensor Battery &amp; Signal</div>
+      <div class="panel-body scroll-body">
+        <table class="data-table" id="health-table">
+          <thead><tr>
+            <th>Sensor</th><th>Zone</th><th>Battery</th><th>Signal</th><th>Status</th>
+          </tr></thead>
+          <tbody><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
-                // 3. Récupérer les Stats par zone
-                const statsRes = await fetch('/statistics');
-                const stats = await statsRes.json();
+  </div>
 
-                // 4. Récupérer les vraies KPIs globales (sans limite de pagination)
-                const kpisRes = await fetch('/kpis');
-                const kpis = await kpisRes.json();
+</main>
 
-                // === MISE A JOUR DES KPI ===
-                document.getElementById('kpi-containers').innerText = kpis ? kpis.total_containers : 0;
-                document.getElementById('kpi-sensors').innerText = kpis ? kpis.active_sensors : 0;
-                document.getElementById('kpi-anomalies').innerText = kpis ? kpis.total_anomalies : 0;
-                
-                if(stats && stats.data && stats.data.length > 0) {
-                    // Trouver la zone avec le plus d'activité (total_events_1h)
-                    const sortedZones = [...stats.data].sort((a,b) => b.total_events_1h - a.total_events_1h);
-                    if (sortedZones[0] && sortedZones[0].zone) {
-                        document.getElementById('kpi-active-zone').innerText = sortedZones[0].zone.replace('_', ' ') + ' (' + sortedZones[0].total_events_1h + ' msg/h)';
-                    } else {
-                        document.getElementById('kpi-active-zone').innerText = "Aucune active";
-                    }
-                } else {
-                    document.getElementById('kpi-active-zone').innerText = "Aucune";
-                }
+<script>
+  const API = '';   // same origin
 
-                // === MISE A JOUR DES ANOMALIES (FEED) ===
-                const anomalyContainer = document.getElementById('anomaly-container');
-                if (!anomalies || anomalies.length === 0) {
-                    anomalyContainer.innerHTML = `<div style="text-align:center; padding:50px; color: var(--text-muted);">Aucune anomalie détectée</div>`;
-                } else {
-                    anomalyContainer.innerHTML = anomalies.map(anom => {
-                        const typeStr = anom.anomaly_type ? anom.anomaly_type.replace(/_/g, ' ') : 'ANOMALIE';
-                        const descStr = anom.description || 'Valeur hors limite';
-                        const sevClass = anom.severity || 'MEDIUM';
-                        const sensorStr = anom.sensor_id || 'INCONNU';
-                        const timeStr = anom.detected_at ? new Date(anom.detected_at).toLocaleTimeString('fr-FR') : '--:--';
-                        
-                        return `
-                        <div class="anomaly-item">
-                            <div class="anomaly-meta">
-                                <span><i class="fa-solid fa-microchip"></i> ${sensorStr}</span>
-                                <span class="severity-badge sev-${sevClass}">${sevClass}</span>
-                            </div>
-                            <span class="anomaly-title">${typeStr}</span>
-                            <span class="anomaly-desc">${descStr}</span>
-                            <span style="font-size:10px; color: var(--text-muted); align-self: flex-end;">
-                                <i class="fa-regular fa-clock"></i> ${timeStr}
-                            </span>
-                        </div>
-                    `}).join('');
-                }
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const fmt = (v, d=1) => v != null ? Number(v).toFixed(d) : '—';
 
-                // === MISE A JOUR DU TABLEAU DES CONTENEURS ===
-                const tableBody = document.getElementById('container-rows');
-                if(!containers || containers.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Aucun conteneur en transit</td></tr>`;
-                } else {
-                    tableBody.innerHTML = containers.map(c => {
-                        const cid = c.container_id || 'INCONNU';
-                        const zoneStr = c.current_zone ? c.current_zone.replace(/_/g, ' ') : 'Transit';
-                        const tempStr = c.temperature_celsius !== null && c.temperature_celsius !== undefined ? c.temperature_celsius.toFixed(1) + ' °C' : '-';
-                        const eqStatus = c.equipment_status || 'ACTIVE';
-                        const flaggedStr = c.is_flagged ? '<span class="badge badge-flagged"><i class="fa-solid fa-triangle-exclamation"></i> ALERTE</span>' : '<span style="color:var(--success);"><i class="fa-solid fa-circle-check"></i> R.A.S</span>';
-                        
-                        return `
-                        <tr>
-                            <td style="font-weight: 800; color: var(--primary);">${cid}</td>
-                            <td><i class="fa-solid fa-map-pin" style="color:var(--primary); margin-right:6px;"></i> ${zoneStr}</td>
-                            <td style="font-weight:600;">${tempStr}</td>
-                            <td><span class="badge badge-${eqStatus.toLowerCase()}">${eqStatus}</span></td>
-                            <td style="font-size:13px; color: var(--text-muted);">${formatDate(c.last_seen)}</td>
-                            <td>${flaggedStr}</td>
-                        </tr>
-                    `}).join('');
-                }
+  function badge(text, cls) {
+    return `<span class="badge badge-${cls.toLowerCase()}">${text}</span>`;
+  }
 
-                // === MISE A JOUR DE LA CARTE INTERACTIVE ===
-                markerGroup.clearLayers();
-                if (containers) {
-                    containers.forEach(c => {
-                        if (c.current_lat !== null && c.current_lon !== null) {
-                            const lat = parseFloat(c.current_lat);
-                            const lon = parseFloat(c.current_lon);
-                            
-                            // VALIDATION GÉOGRAPHIQUE : Filtrer les coordonnées aberrantes pour ne pas faire planter Leaflet
-                            if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
-                                const isAnomaly = c.is_flagged;
-                                
-                                // Icone personnalisée et colorée selon le statut d'anomalie
-                                const markerColor = isAnomaly ? '#ef4444' : '#00f2fe';
-                                const markerIcon = L.divIcon({
-                                    className: 'custom-div-icon',
-                                    html: `<div style="background-color: ${markerColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px ${markerColor};"></div>`,
-                                    iconSize: [14, 14],
-                                    iconAnchor: [7, 7]
-                                });
+  function severityBadge(sev) {
+    return badge(sev, sev.toLowerCase());
+  }
 
-                                const marker = L.marker([lat, lon], { icon: markerIcon });
-                                const cid = c.container_id || 'INCONNU';
-                                const zoneStr = c.current_zone ? c.current_zone.replace(/_/g, ' ') : 'Transit';
-                                const tempStr = c.temperature_celsius !== null && c.temperature_celsius !== undefined ? c.temperature_celsius.toFixed(1) + ' °C' : '-';
-                                const eqStatus = c.equipment_status || 'ACTIVE';
+  function statusBadge(s) {
+    const map = {ACTIVE:'active', IDLE:'idle', ERROR:'error', OFFLINE:'error',
+                 DOCKED:'docked', LOADING:'loading', UNLOADING:'loading',
+                 DEPARTING:'departing', ANCHORED:'idle'};
+    return badge(s, map[s] || 'idle');
+  }
 
-                                // Ajouter une popup riche au clic sur le conteneur
-                                marker.bindPopup(`
-                                    <div style="font-family: 'Outfit', sans-serif; font-size:13px;">
-                                        <strong style="color:var(--primary); font-size:14px;">${cid}</strong><br/>
-                                        <hr style="margin:6px 0; border-color: rgba(255,255,255,0.1);"/>
-                                        <b>Zone:</b> ${zoneStr}<br/>
-                                        <b>Temp:</b> ${tempStr}<br/>
-                                        <b>Équipement:</b> ${eqStatus}<br/>
-                                        <b>Statut:</b> ${isAnomaly ? '<span style="color:#ef4444; font-weight:800;">⚠️ ALERTE ANOMALIE</span>' : '<span style="color:#10b981;">✅ OK</span>'}
-                                    </div>
-                                `);
-                                markerGroup.addLayer(marker);
-                            } else {
-                                console.warn(`Coordonnées GPS hors-limites ignorées pour la carte : ${c.container_id} (${lat}, ${lon})`);
-                            }
-                        }
-                    });
-                }
+  function timeAgo(iso) {
+    if (!iso) return '—';
+    const diff = (Date.now() - new Date(iso)) / 1000;
+    if (diff < 60)   return `${Math.round(diff)}s ago`;
+    if (diff < 3600) return `${Math.round(diff/60)}m ago`;
+    return `${Math.round(diff/3600)}h ago`;
+  }
 
-            } catch (err) {
-                console.error("Erreur lors de la récupération des données du dashboard: ", err);
-            }
-        }
+  function batColor(pct) {
+    if (pct == null) return '#6b8aad';
+    if (pct < 15) return '#ff3d57';
+    if (pct < 35) return '#ff9100';
+    return '#00e676';
+  }
 
-        // Première exécution immédiate
-        fetchDashboardData();
+  function batBar(pct) {
+    const color = batColor(pct);
+    const width = pct != null ? Math.max(2, pct) : 0;
+    return `<div class="bat-bar-wrap">
+      <div class="bat-bar"><div class="bat-fill" style="width:${width}%;background:${color}"></div></div>
+      <div class="bat-label" style="color:${color}">${pct != null ? fmt(pct,0)+'%' : '—'}</div>
+    </div>`;
+  }
 
-        // Actualiser automatiquement toutes les 3 secondes pour un effet "temps réel"
-        setInterval(fetchDashboardData, 3000);
+  // ── Fetch wrappers ───────────────────────────────────────────────────────────
+  async function get(path) {
+    const r = await fetch(API + path);
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }
 
-    </script>
+  // ── Renderers ────────────────────────────────────────────────────────────────
+
+  function renderKPIs(data) {
+    $('kpi-containers').textContent = data.total_containers ?? '—';
+    $('kpi-anomalies').textContent  = data.open_anomalies   ?? '—';
+    $('kpi-sensors').textContent    = data.active_sensors   ?? '—';
+    $('kpi-vessels').textContent    = data.vessels_docked   ?? '—';
+    $('kpi-flagged').textContent    = data.flagged_containers ?? '—';
+  }
+
+  function renderZones(stats) {
+    const grid = $('zone-grid');
+    if (!stats || !stats.length) { grid.innerHTML = '<div class="empty">No data</div>'; return; }
+    grid.innerHTML = stats.map(z => {
+      const anom  = z.anomaly_count || 0;
+      const cls   = anom > 5 ? 'danger' : anom > 0 ? 'warn' : 'ok';
+      const emoji = anom > 5 ? '🔴' : anom > 0 ? '🟡' : '🟢';
+      const name  = (z.zone || '?').replace(/_/g,' ');
+      return `<div class="zone-cell ${cls}" title="${anom} anomalies">
+        <div class="zone-name">${name}</div>
+        <div class="zone-count">${emoji}</div>
+        <div class="zone-label">${z.total_events_1h||0} events · ${anom} ⚠</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderAnomalies(list) {
+    const tbody = $('anomaly-table').querySelector('tbody');
+    if (!list || !list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No anomalies 🎉</td></tr>'; return; }
+    tbody.innerHTML = list.slice(0, 20).map(a => {
+      const type = a.anomaly_type.replace(/_/g,' ');
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:.7rem">${type}</td>
+        <td>${severityBadge(a.severity)}</td>
+        <td style="color:var(--muted);font-size:.72rem">${(a.zone||'—').replace(/_/g,' ')}</td>
+        <td style="font-family:var(--mono);font-size:.68rem;color:var(--muted)">${a.sensor_id}</td>
+        <td style="color:var(--muted);font-size:.7rem">${timeAgo(a.detected_at)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderVessels(list) {
+    const tbody = $('vessel-table').querySelector('tbody');
+    if (!list || !list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No vessels</td></tr>'; return; }
+    tbody.innerHTML = list.map(v => `<tr>
+      <td style="font-weight:600">${v.vessel_name}</td>
+      <td style="font-size:.72rem;color:var(--muted)">${v.flag_country||'—'}</td>
+      <td style="font-size:.72rem;color:var(--muted)">${(v.berth_location||'—').replace(/_/g,' ')}</td>
+      <td>${statusBadge(v.status)}</td>
+      <td style="font-size:.7rem;color:var(--muted)">${timeAgo(v.arrival_time)}</td>
+    </tr>`).join('');
+  }
+
+  function renderHealth(list) {
+    const tbody = $('health-table').querySelector('tbody');
+    if (!list || !list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No data</td></tr>'; return; }
+    tbody.innerHTML = list.map(s => {
+      const sigColor = s.avg_signal_dbm != null ?
+        (s.avg_signal_dbm > -65 ? 'var(--green)' : s.avg_signal_dbm > -80 ? 'var(--yellow)' : 'var(--red)') :
+        'var(--muted)';
+      const isOff = !s.is_active || (s.minutes_since_last != null && s.minutes_since_last > 5);
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:.7rem">${s.sensor_id}</td>
+        <td style="font-size:.7rem;color:var(--muted)">${(s.zone||'—').replace(/_/g,' ')}</td>
+        <td>${batBar(s.avg_battery)}</td>
+        <td style="font-family:var(--mono);font-size:.72rem;color:${sigColor}">
+          ${s.avg_signal_dbm != null ? fmt(s.avg_signal_dbm,0)+' dBm' : '—'}
+        </td>
+        <td>${isOff ? badge('OFFLINE','error') : badge('ONLINE','active')}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Refresh loop ─────────────────────────────────────────────────────────────
+
+  async function refresh() {
+    try {
+      const [kpis, stats, anomalies, vessels, health] = await Promise.all([
+        get('/kpis'),
+        get('/statistics'),
+        get('/anomalies?limit=20&is_resolved=false'),
+        get('/vessels'),
+        get('/sensors/health'),
+      ]);
+
+      renderKPIs(kpis);
+      renderZones(stats.data);
+      renderAnomalies(anomalies);
+      renderVessels(vessels);
+      renderHealth(health.data);
+
+      $('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    } catch (e) {
+      $('last-update').textContent = 'Connection error — retrying…';
+    }
+  }
+
+  // Restart the progress bar animation on each refresh
+  function restartBar() {
+    const bar = $('refresh-bar');
+    bar.style.animation = 'none';
+    bar.offsetHeight;  // reflow
+    bar.style.animation = '';
+  }
+
+  refresh();
+  setInterval(() => { refresh(); restartBar(); }, 5000);
+</script>
 </body>
 </html>
