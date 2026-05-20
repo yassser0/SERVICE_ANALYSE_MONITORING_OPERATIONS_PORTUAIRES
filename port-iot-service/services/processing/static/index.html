@@ -483,22 +483,22 @@
                 const containersRes = await fetch('/containers?limit=10');
                 const containers = await containersRes.json();
                 
-                // 2. Récupérer les Capteurs (pour les KPI)
-                const sensorsRes = await fetch('/sensors');
-                const sensors = await sensorsRes.json();
-
-                // 3. Récupérer les Anomalies
+                // 2. Récupérer les Anomalies
                 const anomaliesRes = await fetch('/anomalies?limit=10');
                 const anomalies = await anomaliesRes.json();
 
-                // 4. Récupérer les Stats par zone
+                // 3. Récupérer les Stats par zone
                 const statsRes = await fetch('/statistics');
                 const stats = await statsRes.json();
 
+                // 4. Récupérer les vraies KPIs globales (sans limite de pagination)
+                const kpisRes = await fetch('/kpis');
+                const kpis = await kpisRes.json();
+
                 // === MISE A JOUR DES KPI ===
-                document.getElementById('kpi-containers').innerText = containers ? containers.length : 0;
-                document.getElementById('kpi-sensors').innerText = sensors ? sensors.length : 0;
-                document.getElementById('kpi-anomalies').innerText = anomalies ? anomalies.length : 0;
+                document.getElementById('kpi-containers').innerText = kpis ? kpis.total_containers : 0;
+                document.getElementById('kpi-sensors').innerText = kpis ? kpis.active_sensors : 0;
+                document.getElementById('kpi-anomalies').innerText = kpis ? kpis.total_anomalies : 0;
                 
                 if(stats && stats.data && stats.data.length > 0) {
                     // Trouver la zone avec le plus d'activité (total_events_1h)

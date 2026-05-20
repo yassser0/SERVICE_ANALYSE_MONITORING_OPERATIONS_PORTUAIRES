@@ -7,6 +7,8 @@ networks:
 volumes:
   postgres_data:
   data_lake:
+  namenode_data:
+  datanode_data:
 
 services:
   # ─────────────────────────────────────────────
@@ -115,8 +117,10 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      namenode:
+        condition: service_started
     ports:
-      - "8000:8000"
+      - "8004:8004"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - KAFKA_TOPIC=port-iot-data
@@ -128,6 +132,9 @@ services:
       - GPS_LAT_MAX=34.5
       - GPS_LON_MIN=-8.5
       - GPS_LON_MAX=-7.0
+      - HDFS_ENABLED=true
+      - HDFS_URL=http://namenode:9870
+      - HDFS_USER=root
     volumes:
       - data_lake:/data-lake
     networks:
@@ -173,5 +180,42 @@ services:
     volumes:
       - ./grafana/dashboards:/var/lib/grafana/dashboards
       - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - port-iot-network
+
+  # ─────────────────────────────────────────────
+  # Hadoop NameNode
+  # ─────────────────────────────────────────────
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: port_namenode
+    hostname: namenode
+    ports:
+      - "9871:9870"
+    environment:
+      - CLUSTER_NAME=port-iot-cluster
+      - HDFS_CONF_dfs_client_block_write_replace__datanode__on__failure_enable=false
+      - HDFS_CONF_dfs_client_block_write_replace__datanode__on__failure_policy=NEVER
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    networks:
+      - port-iot-network
+
+  # ─────────────────────────────────────────────
+  # Hadoop DataNode
+  # ─────────────────────────────────────────────
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: port_datanode
+    hostname: datanode
+    depends_on:
+      - namenode
+    environment:
+      - CLUSTER_NAME=port-iot-cluster
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_client_block_write_replace__datanode__on__failure_enable=false
+      - HDFS_CONF_dfs_client_block_write_replace__datanode__on__failure_policy=NEVER
+    volumes:
+      - datanode_data:/hadoop/dfs/data
     networks:
       - port-iot-network

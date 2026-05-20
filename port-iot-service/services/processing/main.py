@@ -105,6 +105,22 @@ async def get_statistics(db: AsyncSession = Depends(get_db)):
         logger.error(f"Error fetching statistics: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+@app.get("/kpis")
+async def get_kpis(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        container_count = (await db.execute(text("SELECT COUNT(*) FROM containers"))).scalar()
+        anomaly_count = (await db.execute(text("SELECT COUNT(*) FROM anomalies"))).scalar()
+        sensor_count = (await db.execute(text("SELECT COUNT(*) FROM sensors WHERE is_active = TRUE"))).scalar()
+        return {
+            "total_containers": container_count,
+            "total_anomalies": anomaly_count,
+            "active_sensors": sensor_count
+        }
+    except Exception as e:
+        logger.error(f"Error fetching KPIs: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
 # Serve Interactive Dashboard HTML at Root "/"
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 

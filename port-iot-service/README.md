@@ -82,14 +82,14 @@ This will start the following containers:
 - `kafka` (Port 9092)
 - `kafdrop` (Port 9000) - Kafka Web UI
 - `postgres` (Port 5432)
-- `fastapi` (Port 8000) - Processing API
+- `fastapi` (Port 8004) - Processing API
 - `simulator` - Background Python script emitting events
 - `grafana` (Port 3000) - Dashboard tool
 
 ### 3. Verify the Deployment
 
 1. **Kafka UI**: Open [http://localhost:9000](http://localhost:9000) to view the `port-iot-data` topic and see messages streaming in real-time.
-2. **FastAPI Swagger**: Open [http://localhost:8000/docs](http://localhost:8000/docs) to explore and interact with the REST API.
+2. **FastAPI Swagger**: Open [http://localhost:8004/docs](http://localhost:8004/docs) to explore and interact with the REST API.
 3. **Data Lake**: Check the auto-generated `data-lake/bronze/` folder in the project root to see raw JSONL files.
 4. **Grafana**: Open [http://localhost:3000](http://localhost:3000) (admin / grafana2024). Connect to PostgreSQL using the connection string defined in the `.env` file to visualize the `v_live_sensor_stats`, `v_container_positions`, and `v_anomaly_summary` views.
 

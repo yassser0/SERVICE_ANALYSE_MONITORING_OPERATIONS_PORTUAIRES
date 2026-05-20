@@ -40,11 +40,32 @@ class KafkaIoTConsumer:
         # Ensure Data Lake directories exist
         for tier in ['bronze', 'silver', 'gold']:
             os.makedirs(os.path.join(DATA_LAKE_PATH, tier), exist_ok=True)
+            
+        # HDFS Configuration
+        self.hdfs_enabled = os.getenv("HDFS_ENABLED", "false").lower() == "true"
+        self.hdfs_url = os.getenv("HDFS_URL", "http://namenode:9870")
+        self.hdfs_user = os.getenv("HDFS_USER", "root")
+        self.hdfs_client = None
+        self.hdfs_lock = asyncio.Lock()
+        
+        if self.hdfs_enabled:
+            try:
+                from hdfs import InsecureClient
+                self.hdfs_client = InsecureClient(self.hdfs_url, user=self.hdfs_user)
+                logger.info(f"HDFS Data Lake integration enabled pointing to {self.hdfs_url}")
+            except Exception as e:
+                logger.error(f"Failed to initialize HDFS client: {e}. HDFS storage disabled.")
+                self.hdfs_enabled = False
 
     async def start(self):
         self.consumer.subscribe([KAFKA_TOPIC])
         self.running = True
         logger.info(f"Kafka Consumer started, subscribed to {KAFKA_TOPIC}")
+        
+        # Start background HDFS sync loop
+        sync_task = None
+        if self.hdfs_enabled:
+            sync_task = asyncio.create_task(self.hdfs_sync_loop())
         
         try:
             while self.running:
@@ -69,6 +90,12 @@ class KafkaIoTConsumer:
         finally:
             self.consumer.close()
             logger.info("Kafka Consumer closed.")
+            if sync_task:
+                sync_task.cancel()
+                try:
+                    await sync_task
+                except asyncio.CancelledError:
+                    pass
 
     def stop(self):
         self.running = False
@@ -83,6 +110,9 @@ class KafkaIoTConsumer:
             
             # 2. Validate payload
             payload = SensorDataPayload(**raw_payload)
+            
+            # Store Validated Clean Data to Silver Data Lake
+            await self.store_silver_datalake(raw_payload)
             
             # 3. Detect Anomalies & Update State
             async with AsyncSessionLocal() as session:
@@ -99,16 +129,136 @@ class KafkaIoTConsumer:
             logger.error(f"Failed to process message: {e}")
 
     async def store_bronze_datalake(self, payload):
-        # In a real system, this would be batched and stored as Parquet
-        # For simplicity, we just append to a daily JSONL file
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        filepath = os.path.join(DATA_LAKE_PATH, "bronze", f"raw_events_{today_str}.jsonl")
         
-        def write_file():
-            with open(filepath, 'a') as f:
+        # Local Storage (Bronze Tier)
+        local_filepath = os.path.join(DATA_LAKE_PATH, "bronze", f"raw_events_{today_str}.jsonl")
+        def write_local():
+            with open(local_filepath, 'a') as f:
                 f.write(json.dumps(payload) + '\n')
-                
-        await asyncio.to_thread(write_file)
+        await asyncio.to_thread(write_local)
+
+    async def store_silver_datalake(self, payload):
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        
+        # Local Storage (Silver Tier)
+        local_filepath = os.path.join(DATA_LAKE_PATH, "silver", f"clean_events_{today_str}.jsonl")
+        def write_local_silver():
+            with open(local_filepath, 'a') as f:
+                f.write(json.dumps(payload) + '\n')
+        await asyncio.to_thread(write_local_silver)
+
+    async def hdfs_sync_loop(self):
+        logger.info("HDFS Data Lake sync loop started.")
+        while self.running:
+            try:
+                # Wait 10 seconds between syncs
+                await asyncio.sleep(10)
+                if self.hdfs_enabled and self.hdfs_client:
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    
+                    # 1. Compile Gold KPIs from database
+                    gold_kpis = {}
+                    async with AsyncSessionLocal() as session:
+                        try:
+                            # Query live statistics from v_live_sensor_stats view
+                            stats_res = await session.execute(text("SELECT * FROM v_live_sensor_stats"))
+                            zone_stats = []
+                            for row in stats_res:
+                                zone_stats.append({
+                                    "zone": row.zone,
+                                    "active_sensors": row.active_sensors,
+                                    "total_events_1h": row.total_events_1h,
+                                    "avg_temperature": float(row.avg_temperature) if row.avg_temperature else None,
+                                    "max_temperature": float(row.max_temperature) if row.max_temperature else None
+                                })
+                            
+                            # Query anomalies metrics
+                            anomaly_res = await session.execute(text(
+                                "SELECT severity, count(*) as count, "
+                                "sum(case when is_resolved then 1 else 0 end) as resolved "
+                                "FROM anomalies GROUP BY severity"
+                            ))
+                            anomalies_summary = []
+                            for row in anomaly_res:
+                                anomalies_summary.append({
+                                    "severity": row.severity,
+                                    "count": row.count,
+                                    "resolved": int(row.resolved) if row.resolved else 0
+                                })
+                            
+                            # Query total and flagged containers
+                            container_res = await session.execute(text(
+                                "SELECT count(*) as total, sum(case when is_flagged then 1 else 0 end) as flagged FROM containers"
+                            ))
+                            c_row = container_res.fetchone()
+                            containers_summary = {
+                                "total_containers": c_row.total if c_row else 0,
+                                "flagged_containers": int(c_row.flagged) if c_row and c_row.flagged else 0
+                            }
+                            
+                            gold_kpis = {
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "zone_statistics": zone_stats,
+                                "anomalies_summary": anomalies_summary,
+                                "containers_summary": containers_summary
+                            }
+                        except Exception as e:
+                            logger.error(f"Error compiling Gold KPIs from DB: {e}")
+
+                    # Write Gold KPIs locally
+                    if gold_kpis:
+                        local_gold_filepath = os.path.join(DATA_LAKE_PATH, "gold", f"kpi_summary_{today_str}.json")
+                        def write_local_gold():
+                            with open(local_gold_filepath, 'w') as f:
+                                json.dump(gold_kpis, f, indent=4)
+                        await asyncio.to_thread(write_local_gold)
+
+                    # 2. Sync Bronze to HDFS
+                    local_bronze = os.path.join(DATA_LAKE_PATH, "bronze", f"raw_events_{today_str}.jsonl")
+                    if os.path.exists(local_bronze):
+                        hdfs_bronze_dir = "/datalake/bronze"
+                        hdfs_bronze_path = f"{hdfs_bronze_dir}/raw_events_{today_str}.jsonl"
+                        def sync_bronze():
+                            try:
+                                self.hdfs_client.makedirs(hdfs_bronze_dir)
+                                self.hdfs_client.upload(hdfs_bronze_path, local_bronze, overwrite=True)
+                            except Exception as e:
+                                logger.error(f"Error syncing Bronze to HDFS: {e}")
+                        await asyncio.to_thread(sync_bronze)
+                        logger.info(f"HDFS Sync: Bronze Tier updated -> {hdfs_bronze_path}")
+
+                    # 3. Sync Silver to HDFS
+                    local_silver = os.path.join(DATA_LAKE_PATH, "silver", f"clean_events_{today_str}.jsonl")
+                    if os.path.exists(local_silver):
+                        hdfs_silver_dir = "/datalake/silver"
+                        hdfs_silver_path = f"{hdfs_silver_dir}/clean_events_{today_str}.jsonl"
+                        def sync_silver():
+                            try:
+                                self.hdfs_client.makedirs(hdfs_silver_dir)
+                                self.hdfs_client.upload(hdfs_silver_path, local_silver, overwrite=True)
+                            except Exception as e:
+                                logger.error(f"Error syncing Silver to HDFS: {e}")
+                        await asyncio.to_thread(sync_silver)
+                        logger.info(f"HDFS Sync: Silver Tier updated -> {hdfs_silver_path}")
+
+                    # 4. Sync Gold to HDFS
+                    local_gold = os.path.join(DATA_LAKE_PATH, "gold", f"kpi_summary_{today_str}.json")
+                    if os.path.exists(local_gold):
+                        hdfs_gold_dir = "/datalake/gold"
+                        hdfs_gold_path = f"{hdfs_gold_dir}/kpi_summary_{today_str}.json"
+                        def sync_gold():
+                            try:
+                                self.hdfs_client.makedirs(hdfs_gold_dir)
+                                self.hdfs_client.upload(hdfs_gold_path, local_gold, overwrite=True)
+                            except Exception as e:
+                                logger.error(f"Error syncing Gold to HDFS: {e}")
+                        await asyncio.to_thread(sync_gold)
+                        logger.info(f"HDFS Sync: Gold Tier updated -> {hdfs_gold_path}")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in HDFS sync loop: {e}")
 
     async def handle_business_logic(self, session: AsyncSession, data: SensorDataPayload, raw_payload: dict):
         anomalies = []
@@ -169,12 +319,31 @@ class KafkaIoTConsumer:
             "is_anom": is_anomaly
         })
 
-        # 2. Update Sensor Last Seen
+        # 2. Update/Insert Sensor dynamically (Auto-register new sensors from simulator)
+        sens_id = data.sensor_id
+        sens_type = 'COMBINED'
+        if 'GPS' in sens_id:
+            sens_type = 'GPS'
+        elif 'TEMP' in sens_id:
+            sens_type = 'TEMPERATURE'
+        elif 'MOV' in sens_id:
+            sens_type = 'MOVEMENT'
+        elif 'EQP' in sens_id:
+            sens_type = 'EQUIPMENT_STATUS'
+
         await session.execute(text("""
-            UPDATE sensors 
-            SET last_seen = :ts, zone = :zone 
-            WHERE sensor_id = :sens_id
-        """), {"ts": data.timestamp, "zone": data.zone, "sens_id": data.sensor_id})
+            INSERT INTO sensors (sensor_id, sensor_type, zone, last_seen, is_active)
+            VALUES (:sens_id, :sens_type, :zone, :ts, TRUE)
+            ON CONFLICT (sensor_id) DO UPDATE SET
+                last_seen = EXCLUDED.last_seen,
+                zone = EXCLUDED.zone,
+                is_active = TRUE
+        """), {
+            "sens_id": sens_id,
+            "sens_type": sens_type,
+            "zone": data.zone,
+            "ts": data.timestamp
+        })
 
         # 3. Update Container State if applicable
         if data.container_id:
