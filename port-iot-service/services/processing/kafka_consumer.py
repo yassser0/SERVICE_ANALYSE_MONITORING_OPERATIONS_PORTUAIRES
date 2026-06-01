@@ -113,6 +113,41 @@ class KafkaIoTConsumer:
     def stop(self):
         self.running = False
 
+    # ── Telegram Helper ───────────────────────────────────────────────────────
+    
+    async def send_alert_to_bot_service(self, sensor_id: str, anomaly_type: str, text: str):
+        bot_id = os.getenv("ALERT_BOT_ID")
+        chat_id = os.getenv("ALERT_CHAT_ID")
+        # Use host.docker.internal to reach port 8001 on the host machine
+        bot_service_url = os.getenv("BOT_SERVICE_URL", "http://host.docker.internal:8001/api/send-alert")
+        
+        if not bot_id or not chat_id:
+            return
+            
+        payload = {
+            "bot_id": bot_id,
+            "chat_id": chat_id,
+            "sensor_id": sensor_id,
+            "anomaly_type": anomaly_type,
+            "message": text
+        }
+        
+        def _post():
+            import urllib.request
+            import urllib.error
+            req = urllib.request.Request(
+                bot_service_url, 
+                data=json.dumps(payload).encode('utf-8'), 
+                headers={'Content-Type': 'application/json'}
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    pass
+            except Exception as e:
+                logger.error(f"Failed to reach Bot Service: {e}")
+                
+        await asyncio.to_thread(_post)
+
     # ── Message Processing ────────────────────────────────────────────────────
 
     async def process_message(self, msg):
@@ -322,6 +357,14 @@ class KafkaIoTConsumer:
                 raw_payload   = raw,
                 detected_at   = data.timestamp,
             ))
+            # Send Telegram alert
+            alert_text = (
+                f"🚨 *Nouvelle Anomalie : {anom['type']}*\n"
+                f"Sévérité : `{anom['severity']}`\n"
+                f"Capteur : `{data.sensor_id}` (Zone: {data.zone})\n"
+                f"Détails : {anom['desc']}"
+            )
+            await self.send_alert_to_bot_service(data.sensor_id, anom["type"], alert_text)
 
     # ── Sensor Offline Check (background loop) ────────────────────────────────
 
@@ -354,6 +397,14 @@ class KafkaIoTConsumer:
                             zone         = row.zone,
                             detected_at  = datetime.now(timezone.utc),
                         ))
+                        # Send Telegram alert
+                        alert_text = (
+                            f"⚠️ *Alerte Capteur Hors Ligne*\n"
+                            f"Sévérité : `HIGH`\n"
+                            f"Capteur : `{row.sensor_id}` (Zone: {row.zone})\n"
+                            f"Détails : Le capteur ne répond plus depuis plus de {SENSOR_OFFLINE_MINUTES} minutes."
+                        )
+                        await self.send_alert_to_bot_service(row.sensor_id, 'SENSOR_OFFLINE', alert_text)
                     await session.commit()
             except asyncio.CancelledError:
                 break

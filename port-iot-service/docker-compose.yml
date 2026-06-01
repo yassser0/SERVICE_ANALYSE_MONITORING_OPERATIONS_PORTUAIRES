@@ -135,6 +135,9 @@ services:
       - HDFS_ENABLED=true
       - HDFS_URL=http://namenode:9870
       - HDFS_USER=root
+      - ALERT_BOT_ID=${ALERT_BOT_ID}
+      - ALERT_CHAT_ID=${ALERT_CHAT_ID}
+      - BOT_SERVICE_URL=${BOT_SERVICE_URL}
     volumes:
       - data_lake:/data-lake
     networks:
