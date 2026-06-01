@@ -242,7 +242,7 @@
   <div class="status-bar">
     <div class="live-dot"></div>
     <span id="last-update">Connecting…</span>
-    <span id="refresh-status"></span>
+    <button id="logout-btn" style="background:transparent; border:1px solid var(--border); color:var(--text); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; margin-left: 10px; transition: background 0.2s;">Logout</button>
   </div>
 </header>
 
@@ -291,21 +291,9 @@
 
   </div>
 
-  <!-- Vessels + Sensor Health -->
-  <h2 class="section-title">Vessels &amp; Sensor Health</h2>
+  <!-- Sensor Health -->
+  <h2 class="section-title">Sensor Health</h2>
   <div class="two-col">
-
-    <div class="panel">
-      <div class="panel-header">🚢 Vessels in Port</div>
-      <div class="panel-body scroll-body">
-        <table class="data-table" id="vessel-table">
-          <thead><tr>
-            <th>Vessel</th><th>Flag</th><th>Berth</th><th>Status</th><th>Arrival</th>
-          </tr></thead>
-          <tbody><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="panel">
       <div class="panel-header">🔋 Sensor Battery &amp; Signal</div>
@@ -417,17 +405,7 @@
     }).join('');
   }
 
-  function renderVessels(list) {
-    const tbody = $('vessel-table').querySelector('tbody');
-    if (!list || !list.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No vessels</td></tr>'; return; }
-    tbody.innerHTML = list.map(v => `<tr>
-      <td style="font-weight:600">${v.vessel_name}</td>
-      <td style="font-size:.72rem;color:var(--muted)">${v.flag_country||'—'}</td>
-      <td style="font-size:.72rem;color:var(--muted)">${(v.berth_location||'—').replace(/_/g,' ')}</td>
-      <td>${statusBadge(v.status)}</td>
-      <td style="font-size:.7rem;color:var(--muted)">${timeAgo(v.arrival_time)}</td>
-    </tr>`).join('');
-  }
+
 
   function renderHealth(list) {
     const tbody = $('health-table').querySelector('tbody');
@@ -453,18 +431,16 @@
 
   async function refresh() {
     try {
-      const [kpis, stats, anomalies, vessels, health] = await Promise.all([
+      const [kpis, stats, anomalies, health] = await Promise.all([
         get('/kpis'),
         get('/statistics'),
         get('/anomalies?limit=20&is_resolved=false'),
-        get('/vessels'),
         get('/sensors/health'),
       ]);
 
       renderKPIs(kpis);
       renderZones(stats.data);
       renderAnomalies(anomalies);
-      renderVessels(vessels);
       renderHealth(health.data);
 
       $('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
@@ -483,6 +459,16 @@
 
   refresh();
   setInterval(() => { refresh(); restartBar(); }, 5000);
+
+  // Logout handler
+  $('logout-btn').addEventListener('click', async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/login';
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
+  });
 </script>
 </body>
 </html>

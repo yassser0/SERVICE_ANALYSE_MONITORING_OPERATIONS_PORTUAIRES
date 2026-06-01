@@ -4,8 +4,9 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Depends, Query, HTTPException, Path
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Depends, Query, HTTPException, Path, Request, Response
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, text
 from typing import List, Optional
@@ -257,12 +258,40 @@ async def get_kpis(db: AsyncSession = Depends(get_db)):
         logger.error(f"Error fetching KPIs: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-# ─── Static Dashboard ─────────────────────────────────────────────────────────
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+# ─── Static Dashboard & Auth ──────────────────────────────────────────────────
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
+ADMIN_USER = os.getenv("ADMIN_USER", "admin")
+ADMIN_PASS = os.getenv("ADMIN_PASS", "PortSecure2024!")
+SESSION_TOKEN = "admin_secret_token"
+
+@app.post("/api/login", tags=["Auth"])
+async def login(body: LoginRequest, response: Response):
+    if body.username == ADMIN_USER and body.password == ADMIN_PASS:
+        response.set_cookie(key="session_token", value=SESSION_TOKEN, httponly=True)
+        return {"status": "success"}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.post("/api/logout", tags=["Auth"])
+async def logout(response: Response):
+    response.delete_cookie("session_token")
+    return {"status": "success"}
+
+@app.get("/login", tags=["Dashboard"])
+async def get_login_page():
+    login_path = os.path.join(static_dir, "login.html")
+    if os.path.exists(login_path):
+        return FileResponse(login_path)
+    raise HTTPException(status_code=404, detail="Login page not found")
 
 @app.get("/", tags=["Dashboard"])
-async def get_dashboard():
+async def get_dashboard(request: Request):
+    if request.cookies.get("session_token") != SESSION_TOKEN:
+        return RedirectResponse(url="/login")
     index_path = os.path.join(static_dir, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
