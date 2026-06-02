@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Depends, Query, HTTPException, Path, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, text
@@ -268,6 +269,8 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 ADMIN_USER = os.getenv("ADMIN_USER", "admin")
 ADMIN_PASS = os.getenv("ADMIN_PASS", "PortSecure2024!")
 SESSION_TOKEN = "admin_secret_token"
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.post("/api/login", tags=["Auth"])
 async def login(body: LoginRequest, response: Response):

@@ -358,10 +358,12 @@ class KafkaIoTConsumer:
                 detected_at   = data.timestamp,
             ))
             # Send Telegram alert
+            anom_type_str = anom['type'].replace("_", " ")
+            zone_str = data.zone.replace("_", " ") if data.zone else "Inconnue"
             alert_text = (
-                f"🚨 *Nouvelle Anomalie : {anom['type']}*\n"
+                f"🚨 *Nouvelle Anomalie : {anom_type_str}*\n"
                 f"Sévérité : `{anom['severity']}`\n"
-                f"Capteur : `{data.sensor_id}` (Zone: {data.zone})\n"
+                f"Capteur : `{data.sensor_id}` (Zone: {zone_str})\n"
                 f"Détails : {anom['desc']}"
             )
             await self.send_alert_to_bot_service(data.sensor_id, anom["type"], alert_text)
@@ -398,10 +400,11 @@ class KafkaIoTConsumer:
                             detected_at  = datetime.now(timezone.utc),
                         ))
                         # Send Telegram alert
+                        zone_str = row.zone.replace("_", " ") if row.zone else "Inconnue"
                         alert_text = (
                             f"⚠️ *Alerte Capteur Hors Ligne*\n"
                             f"Sévérité : `HIGH`\n"
-                            f"Capteur : `{row.sensor_id}` (Zone: {row.zone})\n"
+                            f"Capteur : `{row.sensor_id}` (Zone: {zone_str})\n"
                             f"Détails : Le capteur ne répond plus depuis plus de {SENSOR_OFFLINE_MINUTES} minutes."
                         )
                         await self.send_alert_to_bot_service(row.sensor_id, 'SENSOR_OFFLINE', alert_text)

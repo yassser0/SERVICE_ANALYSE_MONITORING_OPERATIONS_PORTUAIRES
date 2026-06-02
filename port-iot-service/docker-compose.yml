@@ -138,6 +138,8 @@ services:
       - ALERT_BOT_ID=${ALERT_BOT_ID}
       - ALERT_CHAT_ID=${ALERT_CHAT_ID}
       - BOT_SERVICE_URL=${BOT_SERVICE_URL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - data_lake:/data-lake
     networks:
